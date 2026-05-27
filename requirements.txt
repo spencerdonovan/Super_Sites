@@ -1,4 +1,7 @@
 pandas
 numpy
 requests
-json
+matplotlib
+datetime
+plotly>=5.15.0
+streamlit
