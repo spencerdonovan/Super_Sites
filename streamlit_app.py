@@ -1,3 +1,5 @@
+
+
 """Streamlit dashboard for USDA AWDB PTEMP and SNWD data.
 
 This app fetches temperature and snow depth data from the USDA AWDB REST API,
@@ -10,8 +12,9 @@ import pandas as pd
 import datetime
 import time
 import streamlit as st
+import numpy as np
 
-# Map station names to AWDB station triplets.
+#%% Map station names to AWDB station triplets.
 SITE_OPTIONS = {
     'Powder Mountain': '1300:UT:SNTL',
     'Midway Valley': '626:UT:SNTL',
@@ -23,7 +26,7 @@ ELEMENTS = 'PTEMP:*, SNWD::1'
 
 
 @st.cache_data(show_spinner=False)
-def fetch_json(url, timeout=15, retries=3, backoff=1.5):
+def fetch_json(url, timeout=30, retries=3, backoff=1.5):
     """Fetch JSON from the AWDB API with simple retry/backoff behavior."""
     for attempt in range(1, retries + 1):
         try:
@@ -31,6 +34,8 @@ def fetch_json(url, timeout=15, retries=3, backoff=1.5):
             if r.status_code == 200:
                 return r.json()
             st.warning(f'HTTP {r.status_code} from API call')
+        except requests.exceptions.ReadTimeout as e:
+            st.warning(f'Read timeout (attempt {attempt}/{retries}): {e}')
         except Exception as e:
             st.warning(f'Request failed (attempt {attempt}/{retries}): {e}')
 
@@ -233,6 +238,139 @@ def build_plotly_figure(merged, selected_layers, show_snwd, title):
     return fig
 
 
+def build_heatmap_figure(merged, selected_layers, show_snwd, title):
+    """Build a PTEMP heatmap with optional SNWD overlay."""
+    import plotly.graph_objects as go
+
+    ptemp_cols = [c for c in merged.columns if c.startswith('PTEMP')]
+    if not ptemp_cols:
+        return go.Figure()
+
+    merged = merged.copy()
+    merged[ptemp_cols] = (merged[ptemp_cols] - 32.0) * 5.0 / 9.0
+
+    # Use all PTEMP depths for the heatmap, even if some layers are hidden in the line chart.
+    depth_pairs = []
+    for c in ptemp_cols:
+        try:
+            depth = int(c.split('_', 1)[1])
+        except Exception:
+            depth = None
+        if depth is not None and depth >= 0 and c in merged.columns:
+            depth_pairs.append((c, depth))
+
+    if not depth_pairs:
+        return go.Figure()
+
+    depth_pairs.sort(key=lambda x: x[1])
+    col_order = [p[0] for p in depth_pairs]
+    depths = np.array([p[1] for p in depth_pairs], dtype=float)
+
+    # Build a finer vertical grid so the heatmap displays a smooth color fade between sensors.
+    if len(depths) > 1:
+        min_gap = np.min(np.diff(np.unique(depths)))
+        resolution = min(1.0, float(min_gap) / 4.0)
+    else:
+        resolution = 1.0
+
+    interp_heights = np.arange(depths.min(), depths.max() + resolution, resolution)
+    interp_heights = np.round(interp_heights, 3)
+
+    z = np.full((len(interp_heights), len(merged.index)), np.nan)
+    for col_idx, col in enumerate(col_order):
+        z_src = merged[col].to_numpy(dtype=float)
+        if col_idx == 0:
+            source_values = np.vstack([z_src])
+        else:
+            source_values = np.vstack([source_values, z_src])
+
+    # Interpolate in height for each timestamp so the heatmap fully fills the vertical profile.
+    for time_index in range(z.shape[1]):
+        valid = ~np.isnan(source_values[:, time_index])
+        if np.count_nonzero(valid) >= 2:
+            z[:, time_index] = np.interp(
+                interp_heights,
+                depths[valid],
+                source_values[valid, time_index],
+                left=source_values[valid, time_index][0],
+                right=source_values[valid, time_index][-1]
+            )
+        elif np.count_nonzero(valid) == 1:
+            z[:, time_index] = source_values[valid, time_index][0]
+
+    if show_snwd and 'SNWD' in merged.columns:
+        max_snwd = merged['SNWD'].max()
+        if pd.isna(max_snwd):
+            max_snwd = 126
+    else:
+        max_snwd = 126
+
+    # Limit interpolated heights to max SNWD so y-axis scales match
+    interp_heights = interp_heights[interp_heights <= max_snwd]
+    z = z[:len(interp_heights), :]
+
+    z_min = np.nanmin(z)
+    z_max = np.nanmax(z)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Heatmap(
+            x=merged.index,
+            y=interp_heights,
+            z=z,
+            colorscale='RdBu_r',
+            zmid=0,
+            zmin=z_min,
+            zmax=z_max,
+            colorbar=dict(title='PTEMP (°C)'),
+            xgap=0,
+            ygap=0,
+            zsmooth='best',
+            hoverongaps=False,
+            hovertemplate='Height: %{y} in<br>%{x|%Y-%m-%d %H:%M}<br>PTEMP: %{z:.2f} °C<extra></extra>'
+        )
+    )
+
+    if show_snwd and 'SNWD' in merged.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=merged.index,
+                y=merged['SNWD'],
+                name='SNWD',
+                line=dict(color='black', width=2),
+                mode='lines',
+                hovertemplate='%{x|%Y-%m-%d %H:%M}: SNWD=%{y:.2f} in<extra></extra>',
+                yaxis='y2'
+            )
+        )
+
+    layout = dict(
+        title={'text': f'{title} — PTEMP heatmap', 'y': 0.99, 'x': 0.01, 'xanchor': 'left', 'yanchor': 'top'},
+        xaxis=dict(title='Date', type='date', uirevision='static'),
+        yaxis=dict(
+            title='Height (in)',
+            autorange=False,
+            range=[0, max_snwd],
+            tickmode='array',
+            tickvals=[d for d in depths if d <= max_snwd],
+            ticktext=[str(int(v)) if float(v).is_integer() else str(v) for v in depths if v <= max_snwd],
+            uirevision='static'
+        ),
+        margin=dict(l=60, r=60, t=100, b=120),
+        height=520,
+        hovermode='x unified'
+    )
+
+    if show_snwd and 'SNWD' in merged.columns:
+        layout['yaxis2'] = dict(
+            title='SNWD (in)', overlaying='y', side='right', showgrid=False, uirevision='static'
+        )
+
+    fig.update_layout(**layout)
+
+    return fig
+
+
 def main():
     """Main Streamlit app layout and behavior."""
     st.set_page_config(page_title='PTEMP / SNWD Dashboard', layout='wide')
@@ -267,7 +405,18 @@ def main():
             return
 
         # List available PTEMP depth traces and allow user selection.
-        ptemp_cols = [c for c in merged.columns if c.startswith('PTEMP')]
+        ptemp_cols = []
+        for c in merged.columns:
+            if not c.startswith('PTEMP'):
+                continue
+            try:
+                if int(c.split('_', 1)[1]) >= 0:
+                    ptemp_cols.append(c)
+            except Exception:
+                ptemp_cols.append(c)
+
+        if not ptemp_cols:
+            st.warning('No PTEMP series found for this station/date range. Adjust the dates or select a different station to see the vertical PTEMP heatmap.')
 
         # Determine which PTEMP layers are ever buried (based on midnight SNWD)
         never_buried = []
@@ -308,7 +457,13 @@ def main():
     fig = build_plotly_figure(merged, selected_layers, show_snwd, title)
 
     # Render the Plotly figure in the app with a static key to preserve zoom/pan state.
-    st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True}, key='ptemp_snwd_chart')
+    st.plotly_chart(fig, config={'scrollZoom': True}, key='ptemp_snwd_chart')
+
+    heatmap_fig = build_heatmap_figure(merged, selected_layers, show_snwd, title)
+    if heatmap_fig.data:
+        st.markdown('---')
+        st.subheader('PTEMP vertical profile heatmap')
+        st.plotly_chart(heatmap_fig, config={'scrollZoom': True}, key='ptemp_heatmap_chart')
 
     if show_data_table:
         st.subheader('Raw merged time series')
