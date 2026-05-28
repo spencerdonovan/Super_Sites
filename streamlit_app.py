@@ -170,7 +170,7 @@ def build_plotly_figure(merged, selected_layers, show_snwd, title):
                 x=series.index,
                 y=series.values,
                 name=f'{col} baseline',
-                line=dict(color='grey', width=1),
+                line=dict(color='lightgrey', width=1),
                 mode='lines',
                 hoverinfo='skip',
                 showlegend=False

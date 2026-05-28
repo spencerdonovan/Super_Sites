@@ -169,12 +169,16 @@ Created on Mon May  5 11:30:00 2025
 # Using ARCcwr environment
 
 from flask import Flask, request, render_template_string
+import os
 import pandas as pd
 import requests
 from dmp_qc import check_qc_rules_all   # QC function
 
 # ********* Load region CSV ********
 df_regions = pd.read_csv("SiteList.csv")
+
+# Streamlit host can be overridden through environment on PythonAnywhere.
+STREAMLIT_URL = os.getenv("STREAMLIT_URL", "http://localhost:8501")
 
 # --- Minimal normalization helper (new) ---
 
@@ -217,6 +221,11 @@ TEMPLATE = """
     body { font-family: Arial, sans-serif; margin: 40px; }
     h1 { color: #2c3e50; }
 
+    /* Simple tab navigation */
+    .tabs { margin-bottom: 16px; }
+    .tabs a { padding: 8px 14px; margin-right: 8px; text-decoration: none; border: 1px solid #d0d7e6; background:#f7f9fc; color:#003366; border-radius:4px; }
+    .tabs a.active { background:#2c7be5; color:white; }
+
     /* Don't force 100% width; let tables size to content */
     table { border-collapse: collapse; margin-bottom: 30px; }
 
@@ -224,26 +233,9 @@ TEMPLATE = """
     th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
     th { background-color: #f2f2f2; }
 
-    /* QC table: no wrap, auto width, content-driven columns */
-    .qc-table {
-      width: auto !important;        /* shrink to content */
-      table-layout: auto;            /* columns sized by content */
-      font-size: 14px;
-      margin-bottom: 30px;
-    }
-    .qc-table th, .qc-table td {
-      border: 1px solid #ccc;
-      padding: 4px;
-      text-align: left;
-      white-space: nowrap;           /* <-- no wrapping */
-    }
-
-    /* Horizontal scroll wrapper so wide tables don't break the page */
-    .table-wrap {
-      overflow-x: auto;
-      max-width: 100%;
-    }
-
+    .qc-table { width: auto !important; table-layout: auto; font-size: 14px; margin-bottom: 30px; }
+    .qc-table th, .qc-table td { border: 1px solid #ccc; padding: 4px; text-align: left; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; max-width: 100%; }
     .banner { background: #f7fafc; border: 1px solid #dbe5f3; padding: 10px; margin: 16px 0; }
     .empty { color: #888; font-style: italic; }
   </style>
@@ -251,62 +243,78 @@ TEMPLATE = """
 <body>
   <h1>❄️ Snow, SWE, & Precipitation QC Dashboard</h1>
 
-<p style="margin-bottom:20px; font-style:italic; color:#003366;">
-  - Enter a site configuration or region name (e.g. <code>UTDCO</code>, <code>UINTA</code>, <code>SEUT</code>), or full station triplets (e.g. <code>364:UT:SNTL</code>).
-  <br><br>
-  - Use commas or spaces to separate multiple entries.
-  <br><br>
-  - Start date and End date are in MM-DD-YYYY format,
-  <br><br>
-  - Choose either DAILY or HOURLY interval.
-  <br><br>
-  - The dashboard may need to be refreshed if your query fails. The dashboard may also fail if multiple users are running a query at the same time or your internet is experiencing a slowdown :(
-</p>
-
-  <form method="get">
-    Site config: <input type="text" name="site_config" value="{{ site_config }}"><br>
-    Start date:  <input type="date" name="start" value="{{ start }}"><br>
-    End date:    <input type="date" name="end" value="{{ end }}"><br>
-    Interval:
-    <select name="interval">
-      <option value="DAILY"  {% if interval=="DAILY"  %}selected{% endif %}>DAILY</option>
-      <option value="HOURLY" {% if interval=="HOURLY" %}selected{% endif %}>HOURLY</option>
-    </select><br><br>
-    <input type="submit" value="Run QC">
-  </form>
-
-  {% if selection_info %}
-  <div class="banner">
-    <b>Selected Stations</b><br>
-    Count: <b>{{ selection_info.count }}</b><br>
-    Sample: {% if selection_info.sample and selection_info.sample|length > 0 %}
-              {{ selection_info.sample|join(', ') }}
-            {% else %}
-              <span class="empty">none</span>
-            {% endif %}
+  <div class="tabs">
+    <a href="/?view=qc" class="{% if view!='streamlit' %}active{% endif %}">QC Dashboard</a>
+<a href="/?view=streamlit" class="{% if view=='streamlit' %}active{% endif %}">Profile Temperature Dashboard</a>
   </div>
-  {% endif %}
+  
+  {% if view == 'streamlit' %}
+    <div class="banner">
+      <p>The Profile Temperature Dashboard runs as a separate Streamlit app. Click the button below to open it in a new tab.</p>
+      <p><a href="{{ streamlit_url }}" target="_blank" style="display:inline-block;padding:10px 14px;background:#2c7be5;color:white;text-decoration:none;border-radius:4px;">Open Streamlit dashboard</a></p>
+      <p style="font-size:13px;color:#666;">If the Streamlit server is not running, start it with: <code>python -m streamlit run streamlit_app.py</code></p>
+    </div>
+  {% else %}
 
-  {% if results %}
+  <p style="margin-bottom:20px; font-style:italic; color:#003366;">
+    - Enter a site configuration or region name (e.g. <code>UTDCO</code>, <code>UINTA</code>, <code>SEUT</code>), or full station triplets (e.g. <code>364:UT:SNTL</code>).
+    <br><br>
+    - Use commas or spaces to separate multiple entries.
+    <br><br>
+    - Start date and End date are in MM-DD-YYYY format,
+    <br><br>
+    - Choose either DAILY or HOURLY interval.
+    <br><br>
+    - The dashboard may need to be refreshed if your query fails. The dashboard may also fail if multiple users are running a query at the same time or your internet is experiencing a slowdown :(
+  </p>
 
-    {% if results["rule1"].empty and results["rule3"].empty and results["rule4"].empty and results["ruleZ"].empty %}
-    <h2 style="color:gold;">❄️❄️❄️ 😊 Huzzah! No QC rule violations were found 😊❄️❄️❄️</h2>
+    <form method="get">
+      <input type="hidden" name="view" value="qc">
+      Site config: <input type="text" name="site_config" value="{{ site_config }}"><br>
+      Start date:  <input type="date" name="start" value="{{ start }}"><br>
+      End date:    <input type="date" name="end" value="{{ end }}"><br>
+      Interval:
+      <select name="interval">
+        <option value="DAILY"  {% if interval=="DAILY"  %}selected{% endif %}>DAILY</option>
+        <option value="HOURLY" {% if interval=="HOURLY" %}selected{% endif %}>HOURLY</option>
+      </select><br><br>
+      <input type="submit" value="Run QC">
+    </form>
+
+    {% if selection_info %}
+    <div class="banner">
+      <b>Selected Stations</b><br>
+      Count: <b>{{ selection_info.count }}</b><br>
+      Sample: {% if selection_info.sample and selection_info.sample|length > 0 %}
+                {{ selection_info.sample|join(', ') }}
+              {% else %}
+                <span class="empty">none</span>
+              {% endif %}
+    </div>
     {% endif %}
 
-    <h2>Rule 1 Violations: No decreases in accumulated precipitation.</h2>
-    <div class="table-wrap">{{ rule1_html | safe }}</div>
+    {% if results %}
 
-    <h2>Rule 3 Violations: No increase in SWE without corresponding increase in precipitation.</h2>
-    <div class="table-wrap">{{ rule3_html | safe }}</div>
+      {% if results["rule1"].empty and results["rule3"].empty and results["rule4"].empty and results["ruleZ"].empty %}
+      <h2 style="color:gold;">❄️❄️❄️ 😊 Huzzah! No QC rule violations were found 😊❄️❄️❄️</h2>
+      {% endif %}
 
-    <h2>Rule 4 Violations: No increase in snow depth without corresponding increase in SWE.</h2>
-    <div class="table-wrap">{{ rule4_html | safe }}</div>
+      <h2>Rule 1 Violations: No decreases in accumulated precipitation.</h2>
+      <div class="table-wrap">{{ rule1_html | safe }}</div>
 
-    <h2>Rule Z Violations: Occurrences where ρ_<code>snow</code> = ∞.</h2>
-    <div class="table-wrap">{{ ruleZ_html | safe }}</div>
+      <h2>Rule 3 Violations: No increase in SWE without corresponding increase in precipitation.</h2>
+      <div class="table-wrap">{{ rule3_html | safe }}</div>
 
-    <h2>Skipped Stations</h2>
-    <div class="table-wrap">{{ skipped_html | safe }}</div>
+      <h2>Rule 4 Violations: No increase in snow depth without corresponding increase in SWE.</h2>
+      <div class="table-wrap">{{ rule4_html | safe }}</div>
+
+      <h2>Rule Z Violations: Occurrences where ρ_<code>snow</code> = ∞.</h2>
+      <div class="table-wrap">{{ ruleZ_html | safe }}</div>
+
+      <h2>Skipped Stations</h2>
+      <div class="table-wrap">{{ skipped_html | safe }}</div>
+    {% endif %}
+
   {% endif %}
 </body>
 </html>
@@ -321,6 +329,7 @@ def qc_dashboard():
     start = request.args.get("start", "")
     end = request.args.get("end", "")
     interval = request.args.get("interval", "")
+    view = request.args.get("view", "qc")
 
     results = None
     selected_triplets = []
@@ -395,15 +404,16 @@ def qc_dashboard():
         start=start,
         end=end,
         interval=interval,
-        results=results,
+      results=results,
+      view=view,
         selection_info=selection_info,
+        streamlit_url=STREAMLIT_URL,
         rule1_html=rule1_html,
         rule3_html=rule3_html,
         rule4_html=rule4_html,
         ruleZ_html=ruleZ_html,
         skipped_html=skipped_html,
     )
-
 
 # ************ Run the app **********
 if __name__ == "__main__":
