@@ -371,89 +371,106 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
     return fig
 
 
-def main():
-    """Main Streamlit app layout and behavior."""
-    st.set_page_config(page_title='PTEMP / SNWD Dashboard', layout='wide')
-    st.title('PTEMP + SNWD Dashboard')
-    st.markdown('Browse station PTEMP heights, compare SNWD, and inspect buried temperature layers.')
+def render_profile_dashboard(show_sidebar: bool = True):
+    st.title('🌡️ PTEMP + SNWD Dashboard')
+    st.markdown('Select Super Site, compare SNWD, and inspect buried beadedstream temperature layers.')
 
-    with st.sidebar:
-        st.header('Data selection')
+    if show_sidebar:
+        with st.sidebar:
+            st.header('Data selection')
 
-        # User controls in the sidebar.
-        station_name = st.selectbox('Station', list(SITE_OPTIONS.keys()), index=0)
+            # User controls in the sidebar.
+            station_name = st.selectbox('Station', list(SITE_OPTIONS.keys()), index=0)
+            site_triplet = SITE_OPTIONS[station_name]
+            interval = st.radio('Interval', ['HOURLY', 'DAILY'], index=0)
+
+            default_end = datetime.date.today()
+            default_start = default_end - datetime.timedelta(days=30)
+            start_date = st.date_input('Start date', default_start)
+            end_date = st.date_input('End date', default_end)
+
+    else:
+        station_name = list(SITE_OPTIONS.keys())[0]
         site_triplet = SITE_OPTIONS[station_name]
-        interval = st.radio('Interval', ['HOURLY', 'DAILY'])
+        interval = 'HOURLY'
+        default_end = datetime.date.today()
+        default_start = default_end - datetime.timedelta(days=30)
+        start_date = default_start
+        end_date = default_end
 
-        default_start = datetime.date(2025, 12, 1)
-        default_end = datetime.date(2026, 5, 8)
-        start_date = st.date_input('Start date', default_start)
-        end_date = st.date_input('End date', default_end)
+    if start_date > end_date:
+        st.error('Start date must be on or before end date.')
+        return
 
-        if start_date > end_date:
-            st.error('Start date must be on or before end date.')
-            return
+    df_dict = build_df_dict(site_triplet, start_date.isoformat(), end_date.isoformat(), interval)
+    if not df_dict:
+        st.warning('No data available for the selected station/date range.')
+        return
 
-        df_dict = build_df_dict(site_triplet, start_date.isoformat(), end_date.isoformat(), interval)
-        if not df_dict:
-            st.warning('No data available for the selected station/date range.')
-            return
+    merged = merge_time_series(df_dict)
+    if merged.empty:
+        st.warning('No valid time series could be created from the API results.')
+        return
 
-        merged = merge_time_series(df_dict)
-        if merged.empty:
-            st.warning('No valid time series could be created from the API results.')
-            return
-
-        # List available PTEMP depth traces and allow user selection.
-        ptemp_cols = []
-        for c in merged.columns:
-            if not c.startswith('PTEMP'):
-                continue
-            try:
-                if int(c.split('_', 1)[1]) >= 0:
-                    ptemp_cols.append(c)
-            except Exception:
+    # List available PTEMP depth traces and allow user selection.
+    ptemp_cols = []
+    for c in merged.columns:
+        if not c.startswith('PTEMP'):
+            continue
+        try:
+            if int(c.split('_', 1)[1]) >= 0:
                 ptemp_cols.append(c)
+        except Exception:
+            ptemp_cols.append(c)
 
-        if not ptemp_cols:
-            st.warning('No PTEMP series found for this station/date range. Adjust the dates or select a different station to see the vertical PTEMP heatmap.')
+    if not ptemp_cols:
+        st.warning('No PTEMP series found for this station/date range. Adjust the dates or select a different station to see the vertical PTEMP heatmap.')
 
-        # Determine which PTEMP layers are ever buried (based on midnight SNWD)
-        never_buried = []
-        if 'SNWD' in merged.columns:
+    # Determine which PTEMP layers are ever buried (based on midnight SNWD)
+    never_buried = []
+    if 'SNWD' in merged.columns:
+        try:
+            midnight_idx = merged[merged.index.hour == 0].index.tolist()
+        except Exception:
+            midnight_idx = []
+
+        for col in ptemp_cols:
             try:
-                midnight_idx = merged[merged.index.hour == 0].index.tolist()
+                h = int(col.split('_', 1)[1])
             except Exception:
-                midnight_idx = []
+                h = None
+            if h is None or not midnight_idx:
+                # treat as potentially buried unless we can prove otherwise
+                continue
 
-            for col in ptemp_cols:
-                try:
-                    h = int(col.split('_', 1)[1])
-                except Exception:
-                    h = None
-                if h is None or not midnight_idx:
-                    # treat as potentially buried unless we can prove otherwise
-                    continue
+            # Check if any midnight snow depth >= sensor height
+            snw_at_midnights = merged.loc[midnight_idx, 'SNWD']
+            if not (snw_at_midnights >= h).any():
+                never_buried.append(col)
 
-                # Check if any midnight snow depth >= sensor height
-                snw_at_midnights = merged.loc[midnight_idx, 'SNWD']
-                if not (snw_at_midnights >= h).any():
-                    never_buried.append(col)
+    if show_sidebar:
+        with st.sidebar:
+            st.header('Display options')
 
-        hide_never_buried = st.checkbox('Hide never-buried PTEMP layers', value=False)
+            hide_never_buried = st.checkbox('Hide never-buried PTEMP layers', value=False)
+            available_cols = [c for c in ptemp_cols if not (hide_never_buried and c in never_buried)]
+            if not available_cols:
+                available_cols = ptemp_cols.copy()
 
-        # Build the options presented in the multiselect according to the toggle
-        available_cols = [c for c in ptemp_cols if not (hide_never_buried and c in never_buried)]
-        default_selected = available_cols.copy()
-        selected_layers = st.multiselect('PTEMP layers to show', available_cols, default=default_selected)
+            selected_layers = st.multiselect('PTEMP layers to show', available_cols, default=available_cols)
 
-        if hide_never_buried and never_buried:
-            st.caption(f'Hiding {len(never_buried)} never-buried layer(s)')
+            if hide_never_buried and never_buried:
+                st.caption(f'Hiding {len(never_buried)} never-buried layer(s)')
 
-        show_snwd = st.checkbox('Show SNWD', value=True)
-        show_data_table = st.checkbox('Show raw data', value=False)
+            show_snwd = st.checkbox('Show SNWD', value=True)
+            show_data_table = st.checkbox('Show raw data', value=False)
+    else:
+        hide_never_buried = False
+        selected_layers = ptemp_cols.copy()
+        show_snwd = True
+        show_data_table = False
 
-    title = f'PTEMP heights vs SNWD for {station_name} ({interval})'
+    title = f'PTEMP heights & SNWD for {station_name} ({interval})'
     fig = build_plotly_figure(merged, selected_layers, show_snwd, title)
 
     # Render the Plotly figure in the app with a static key to preserve zoom/pan state.
@@ -479,4 +496,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    st.set_page_config(page_title='PTEMP / SNWD Dashboard', layout='wide')
+    render_profile_dashboard()
