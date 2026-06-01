@@ -59,7 +59,7 @@ def run_qc_for_triplets(selected_triplets, start, end, interval):
 
 
 def qc_tab_ui(show_sidebar: bool):
-    st.header("❄️ Snow, SWE, & Precipitation QC Dashboard")
+    # st.header("❄️ Snow, SWE, & Precipitation QC Dashboard")
     st.markdown('Use the sidebar to select the station(s), date range, and interval for QC processing.')
 
     site_config = ''
@@ -171,7 +171,7 @@ def render_dashboard_header(selected_dashboard: str):
 def main():
     st.set_page_config(page_title='QC / Profile Dashboards', layout='wide')
 
-    st.title('QC Dashboards')
+    # st.title('QC Dashboards')
 
     with st.sidebar:
         selected_dashboard = st.radio('Select dashboard', DASHBOARD_OPTIONS, key='dashboard_selector')
