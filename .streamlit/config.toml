@@ -1,0 +1,13 @@
+[server]
+headless = true
+port = 8501
+enableCORS = false
+enableWebsocketCompression = true
+enableWebsocketPingInterval = 30
+serverAddress = "0.0.0.0"
+
+[global]
+logLevel = "info"
+
+[browser]
+gatherUsageStats = false
