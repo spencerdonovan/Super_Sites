@@ -74,7 +74,7 @@ def qc_tab_ui(show_sidebar: bool):
             st.markdown(
                 '- Enter a site configuration or region name (e.g. `UTDCO`, `UINTA`, `SEUT`), or full station triplets (e.g. `364:UT:SNTL`).\n'
                 '- Use commas or spaces to separate multiple entries.\n'
-                '- Start date and End date are in date format.\n'
+                '- Adjust start date and end date, default is set to 30 days.\n'
                 '- Choose either DAILY or HOURLY interval.'
             )
 

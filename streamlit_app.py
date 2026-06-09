@@ -339,8 +339,7 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
                 name='SNWD',
                 line=dict(color='black', width=2),
                 mode='lines',
-                hovertemplate='%{x|%Y-%m-%d %H:%M}: SNWD=%{y:.2f} in<extra></extra>',
-                yaxis='y2'
+                hovertemplate='%{x|%Y-%m-%d %H:%M}: SNWD=%{y:.2f} in<extra></extra>'
             )
         )
 
@@ -361,10 +360,7 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
         hovermode='x unified'
     )
 
-    if show_snwd and 'SNWD' in merged.columns:
-        layout['yaxis2'] = dict(
-            title='SNWD (in)', overlaying='y', side='right', showgrid=False, uirevision='static'
-        )
+
 
     fig.update_layout(**layout)
 
@@ -373,8 +369,9 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
 
 def render_profile_dashboard(show_sidebar: bool = True):
     st.title('🌡️ PTEMP + SNWD Dashboard')
-    st.markdown('Select Super Site, compare SNWD, and inspect buried beadedstream temperature layers.')
-
+    st.markdown('Select Super Site, compare snow depth to buried beadedstream temperature layers.')
+    
+    # Inject CSS to move only the tooltip data box to the right, keeping the vertical hover line at the cursor
     if show_sidebar:
         with st.sidebar:
             st.header('Data selection')
@@ -489,7 +486,7 @@ def render_profile_dashboard(show_sidebar: bool = True):
     st.markdown('---')
     st.markdown('### Notes')
     st.markdown(
-        '- PTEMP sensor heights are shown as colored segments when the snow depth at the next midnight was equal to or deeper than the sensor depth.\n'
+        '- PTEMP sensor heights are shown as colored segments when the 00:00 QC snow depth value was greater than or equal to the temperature sensor height.\n'
         '- Use the legend or the sidebar multiselect to hide/show individual PTEMP traces.\n'
         '- The dashboard uses USDA AWDB REST API data for the selected station and date range.'
     )
