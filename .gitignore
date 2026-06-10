@@ -12,7 +12,10 @@ __pycache__/
 *.docx
 
 # Ignore .csv files
-SiteList.csv
+*.csv
+
+# Specific .csv to include
+!SiteList.csv
 
 # Ignore all ESRI tiles
 *.npy
