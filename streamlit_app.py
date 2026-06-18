@@ -14,15 +14,16 @@ import time
 import streamlit as st
 import numpy as np
 
-#%% Map station names to AWDB station triplets.
+# %% Map station names to AWDB station triplets.
 SITE_OPTIONS = {
     'Powder Mountain': '1300:UT:SNTL',
     'Midway Valley': '626:UT:SNTL',
-    'Trial Lake': '828:UT:SNTL'
+    'Trial Lake': '828:UT:SNTL',
+    'Heavenly Valley': '518:NV:SNTL'
 }
 
 # The API query requests all PTEMP depths plus SNWD for the selected station.
-ELEMENTS = 'PTEMP:*, SNWD::1'
+ELEMENTS = 'PTEMP:*, SNWD::1, WTEQ::1'
 
 
 @st.cache_data(show_spinner=False)
@@ -120,7 +121,8 @@ def build_plotly_figure(merged, selected_layers, show_snwd, title):
 
     # Use an HSL palette for PTEMP traces so each line is visually distinct.
     ptemp_cols = [c for c in merged.columns if c.startswith('PTEMP')]
-    colors = [f'hsl({int(i * 137.508) % 360}, 70%, 45%)' for i in range(len(ptemp_cols))]
+    colors = [
+        f'hsl({int(i * 137.508) % 360}, 70%, 45%)' for i in range(len(ptemp_cols))]
 
     # Keep original data untouched; convert only for plotting.
     merged = merged.copy()
@@ -146,7 +148,8 @@ def build_plotly_figure(merged, selected_layers, show_snwd, title):
     # Use midnight values to determine periods where snow depth covers each PTEMP height.
     if 'SNWD' in merged.columns:
         midnight_idx = merged[merged.index.hour == 0].index.tolist()
-        max_midnight_snwd = merged.loc[midnight_idx, 'SNWD'].max() if midnight_idx else None
+        max_midnight_snwd = merged.loc[midnight_idx,
+                                       'SNWD'].max() if midnight_idx else None
     else:
         midnight_idx = []
         max_midnight_snwd = None
@@ -185,13 +188,14 @@ def build_plotly_figure(merged, selected_layers, show_snwd, title):
                 if pd.isna(snwd_val):
                     continue
                 next_midnight = midnite + pd.Timedelta(hours=24)
-                window = (series.index >= midnite) & (series.index < next_midnight)
+                window = (series.index >= midnite) & (
+                    series.index < next_midnight)
                 if snwd_val >= height:
                     colored_mask.loc[window] = True
 
         colored_points = series.where(colored_mask)
         has_coverage = colored_mask.any()
-        
+
         if has_coverage:
             # Buried layers: show colored trace by default
             fig.add_trace(
@@ -223,12 +227,15 @@ def build_plotly_figure(merged, selected_layers, show_snwd, title):
             )
 
     fig.update_layout(
-        title={'text': title, 'y': 0.99, 'x': 0.01, 'xanchor': 'left', 'yanchor': 'top'},
+        title={'text': title, 'y': 0.99, 'x': 0.01,
+               'xanchor': 'left', 'yanchor': 'top'},
         xaxis=dict(title='Date', uirevision='static'),
         yaxis=dict(title='PTEMP (°C)', uirevision='static'),
-        yaxis2=dict(title='SNWD (in)', overlaying='y', side='right', uirevision='static'),
+        yaxis2=dict(title='SNWD (in)', overlaying='y',
+                    side='right', uirevision='static'),
         hovermode='x unified',
-        legend=dict(orientation='h', yanchor='top', y=-0.18, xanchor='center', x=0.5, groupclick='togglegroup'),
+        legend=dict(orientation='h', yanchor='top', y=-0.18,
+                    xanchor='center', x=0.5, groupclick='togglegroup'),
         margin=dict(l=40, r=40, t=100, b=120),
         height=828,
         dragmode='zoom',
@@ -273,7 +280,8 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
     else:
         resolution = 1.0
 
-    interp_heights = np.arange(depths.min(), depths.max() + resolution, resolution)
+    interp_heights = np.arange(
+        depths.min(), depths.max() + resolution, resolution)
     interp_heights = np.round(interp_heights, 3)
 
     z = np.full((len(interp_heights), len(merged.index)), np.nan)
@@ -344,7 +352,8 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
         )
 
     layout = dict(
-        title={'text': f'{title} — PTEMP heatmap', 'y': 0.99, 'x': 0.01, 'xanchor': 'left', 'yanchor': 'top'},
+        title={'text': f'{title} — PTEMP heatmap', 'y': 0.99,
+               'x': 0.01, 'xanchor': 'left', 'yanchor': 'top'},
         xaxis=dict(title='Date', type='date', uirevision='static'),
         yaxis=dict(
             title='Height (in)',
@@ -352,15 +361,14 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
             range=[0, max_snwd],
             tickmode='array',
             tickvals=[d for d in depths if d <= max_snwd],
-            ticktext=[str(int(v)) if float(v).is_integer() else str(v) for v in depths if v <= max_snwd],
+            ticktext=[str(int(v)) if float(v).is_integer() else str(v)
+                      for v in depths if v <= max_snwd],
             uirevision='static'
         ),
         margin=dict(l=60, r=60, t=100, b=120),
         height=520,
         hovermode='x unified'
     )
-
-
 
     fig.update_layout(**layout)
 
@@ -369,15 +377,17 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
 
 def render_profile_dashboard(show_sidebar: bool = True):
     st.title('🌡️ PTEMP + SNWD Dashboard')
-    st.markdown('Select Super Site, compare snow depth to buried beadedstream temperature layers.')
-    
+    st.markdown(
+        'Select Super Site, compare snow depth to buried beadedstream temperature layers.')
+
     # Inject CSS to move only the tooltip data box to the right, keeping the vertical hover line at the cursor
     if show_sidebar:
         with st.sidebar:
             st.header('Data selection')
 
             # User controls in the sidebar.
-            station_name = st.selectbox('Station', list(SITE_OPTIONS.keys()), index=0)
+            station_name = st.selectbox(
+                'Station', list(SITE_OPTIONS.keys()), index=0)
             site_triplet = SITE_OPTIONS[station_name]
             interval = st.radio('Interval', ['HOURLY', 'DAILY'], index=0)
 
@@ -399,7 +409,8 @@ def render_profile_dashboard(show_sidebar: bool = True):
         st.error('Start date must be on or before end date.')
         return
 
-    df_dict = build_df_dict(site_triplet, start_date.isoformat(), end_date.isoformat(), interval)
+    df_dict = build_df_dict(
+        site_triplet, start_date.isoformat(), end_date.isoformat(), interval)
     if not df_dict:
         st.warning('No data available for the selected station/date range.')
         return
@@ -449,12 +460,15 @@ def render_profile_dashboard(show_sidebar: bool = True):
         with st.sidebar:
             st.header('Display options')
 
-            hide_never_buried = st.checkbox('Hide never-buried PTEMP layers', value=False)
-            available_cols = [c for c in ptemp_cols if not (hide_never_buried and c in never_buried)]
+            hide_never_buried = st.checkbox(
+                'Hide never-buried PTEMP layers', value=False)
+            available_cols = [c for c in ptemp_cols if not (
+                hide_never_buried and c in never_buried)]
             if not available_cols:
                 available_cols = ptemp_cols.copy()
 
-            selected_layers = st.multiselect('PTEMP layers to show', available_cols, default=available_cols)
+            selected_layers = st.multiselect(
+                'PTEMP layers to show', available_cols, default=available_cols)
 
             if hide_never_buried and never_buried:
                 st.caption(f'Hiding {len(never_buried)} never-buried layer(s)')
@@ -473,11 +487,13 @@ def render_profile_dashboard(show_sidebar: bool = True):
     # Render the Plotly figure in the app with a static key to preserve zoom/pan state.
     st.plotly_chart(fig, config={'scrollZoom': True}, key='ptemp_snwd_chart')
 
-    heatmap_fig = build_heatmap_figure(merged, selected_layers, show_snwd, title)
+    heatmap_fig = build_heatmap_figure(
+        merged, selected_layers, show_snwd, title)
     if heatmap_fig.data:
         st.markdown('---')
         st.subheader('PTEMP vertical profile heatmap')
-        st.plotly_chart(heatmap_fig, config={'scrollZoom': True}, key='ptemp_heatmap_chart')
+        st.plotly_chart(heatmap_fig, config={
+                        'scrollZoom': True}, key='ptemp_heatmap_chart')
 
     if show_data_table:
         st.subheader('Raw merged time series')
