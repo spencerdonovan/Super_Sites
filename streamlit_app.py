@@ -19,7 +19,7 @@ SITE_OPTIONS = {
     'Powder Mountain': '1300:UT:SNTL',
     'Midway Valley': '626:UT:SNTL',
     'Trial Lake': '828:UT:SNTL',
-    'Heavenly Valley': '518:NV:SNTL'
+    'Heavenly Valley': '518:CA:SNTL'
 }
 
 # The API query requests all PTEMP depths plus SNWD for the selected station.
@@ -76,6 +76,8 @@ def build_df_dict(site_triplet, start_date, end_date, interval, elements=ELEMENT
             hd = item['stationElement']['heightDepth']
             dict_key = f'{elem}_{hd}'
         elif elem == 'SNWD':
+            dict_key = elem
+        elif elem == 'WTEQ':
             dict_key = elem
         else:
             continue
@@ -313,6 +315,11 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
     else:
         max_snwd = 126
 
+    # # NEW LINE
+    # if show_wteq and ('WTEQ' in merged.columns or 'WTEQ1' in merged.columns):
+    #     wteq_col = 'WTEQ' if 'WTEQ' in merged.columns else 'WTEQ1'
+    #     # add your overlay trace using merged[wteq_col]
+
     # Limit interpolated heights to max SNWD so y-axis scales match
     interp_heights = interp_heights[interp_heights <= max_snwd]
     z = z[:len(interp_heights), :]
@@ -350,6 +357,19 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
                 hovertemplate='%{x|%Y-%m-%d %H:%M}: SNWD=%{y:.2f} in<extra></extra>'
             )
         )
+
+    # # --- NEW: WTEQ line on secondary y-axis ---
+    # if show_wteq and 'WTEQ' in merged.columns:
+    #     fig.add_trace(
+    #         go.Scatter(
+    #             x=merged.index,
+    #             y=merged['WTEQ'],
+    #             name='SWE (in)',
+    #             mode='lines',
+    #             line=dict(color='purple', width=2),
+    #             yaxis='y2'
+    #         )
+    #     )
 
     layout = dict(
         title={'text': f'{title} — PTEMP heatmap', 'y': 0.99,
@@ -474,6 +494,10 @@ def render_profile_dashboard(show_sidebar: bool = True):
                 st.caption(f'Hiding {len(never_buried)} never-buried layer(s)')
 
             show_snwd = st.checkbox('Show SNWD', value=True)
+
+            # NEW: control for SWE
+            show_wteq = st.checkbox("Show SWE (WTEQ)", value=True)
+
             show_data_table = st.checkbox('Show raw data', value=False)
     else:
         hide_never_buried = False
@@ -489,6 +513,7 @@ def render_profile_dashboard(show_sidebar: bool = True):
 
     heatmap_fig = build_heatmap_figure(
         merged, selected_layers, show_snwd, title)
+
     if heatmap_fig.data:
         st.markdown('---')
         st.subheader('PTEMP vertical profile heatmap')
