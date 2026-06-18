@@ -6,6 +6,10 @@ Created on Fri May  8 14:00:31 2026
 """
 
 # %%
+import plotly.io as pio
+import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 import requests
 import pandas as pd
 import json
@@ -51,7 +55,7 @@ returnOriginalValues = 'true'
 returnSuspectData = 'true'
 
 # list of elements that you want to request
-elements = 'PTEMP:*, SNWD::1'
+elements = 'PTEMP:*, SNWD::1, WTEQ::1'
 
 
 def build_df_dict():
@@ -114,17 +118,14 @@ def build_df_dict():
 # ---------------------------------------------
 # Interactive Plot: PTEMP vs SNWD using Plotly
 # ---------------------------------------------
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import plotly.express as px
-import plotly.io as pio
 
 
 def ensure_local_plotly_js(js_filename='plotly.min.js'):
     if not os.path.exists(js_filename):
         tmp_html = '__plotly_tmp__.html'
         try:
-            pio.write_html(go.Figure(), tmp_html, include_plotlyjs='directory', full_html=True, auto_open=False)
+            pio.write_html(go.Figure(
+            ), tmp_html, include_plotlyjs='directory', full_html=True, auto_open=False)
         finally:
             if os.path.exists(tmp_html):
                 os.remove(tmp_html)
@@ -171,7 +172,8 @@ def create_interactive_plot(df_dict, title=None):
 
     # Color palette for PTEMP: use evenly spaced hues for better separation between nearby depths
     ptemp_cols = [c for c in merged.columns if c.startswith('PTEMP')]
-    colors = [f'hsl({int(i * 137.508) % 360}, 70%, 45%)' for i in range(len(ptemp_cols))]
+    colors = [
+        f'hsl({int(i * 137.508) % 360}, 70%, 45%)' for i in range(len(ptemp_cols))]
 
     # Get all midnight (00:00) timestamps to define comparison windows
     if 'SNWD' in merged.columns:
@@ -196,10 +198,12 @@ def create_interactive_plot(df_dict, title=None):
         deeper_heights = [h for h in valid_heights if h > max_midnight_snwd]
         if deeper_heights:
             buried_thresh = min(deeper_heights)
-            buried_cols = [col for col, h in zip(ptemp_cols, ptemp_heights) if h is not None and h < buried_thresh]
+            buried_cols = [col for col, h in zip(
+                ptemp_cols, ptemp_heights) if h is not None and h < buried_thresh]
         else:
             buried_thresh = max(valid_heights) + 1 if valid_heights else None
-            buried_cols = [col for col, h in zip(ptemp_cols, ptemp_heights) if h is not None]
+            buried_cols = [col for col, h in zip(
+                ptemp_cols, ptemp_heights) if h is not None]
 
         if buried_thresh is not None and buried_cols:
             thresh_label = f'PTEMP_{buried_thresh}'
@@ -271,14 +275,16 @@ def create_interactive_plot(df_dict, title=None):
         yaxis=dict(title='PTEMP (°C)'),
         yaxis2=dict(title='SNWD (cm)', overlaying='y', side='right'),
         hovermode='x unified',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0)
+        legend=dict(orientation='h', yanchor='bottom',
+                    y=1.02, xanchor='left', x=0)
     )
 
     # Force x-axis to full data range (prevents auto-zoom to a smaller window)
     try:
         xmin = merged.index.min()
         xmax = merged.index.max()
-        fig.update_xaxes(range=[xmin.strftime('%Y-%m-%d %H:%M:%S'), xmax.strftime('%Y-%m-%d %H:%M:%S')])
+        fig.update_xaxes(range=[xmin.strftime(
+            '%Y-%m-%d %H:%M:%S'), xmax.strftime('%Y-%m-%d %H:%M:%S')])
     except Exception:
         pass
 
@@ -313,7 +319,8 @@ def create_layered_html_plot(df_dict, title=None):
 
     merged = pd.concat(proc, axis=1)
     ptemp_cols = [c for c in merged.columns if c.startswith('PTEMP')]
-    colors = [f'hsl({int(i * 137.508) % 360}, 70%, 45%)' for i in range(len(ptemp_cols))]
+    colors = [
+        f'hsl({int(i * 137.508) % 360}, 70%, 45%)' for i in range(len(ptemp_cols))]
 
     data = []
     trace_map = {}
@@ -361,7 +368,8 @@ def create_layered_html_plot(df_dict, title=None):
                 if pd.isna(snwd_val):
                     continue
                 next_midnight = midnite + pd.Timedelta(hours=24)
-                window = (series.index >= midnite) & (series.index < next_midnight)
+                window = (series.index >= midnite) & (
+                    series.index < next_midnight)
                 if snwd_val >= height:
                     colored_mask.loc[window] = True
 
@@ -387,9 +395,11 @@ def create_layered_html_plot(df_dict, title=None):
     }
 
     controls = []
-    controls.append("<label><input type='checkbox' checked data-traces='[0]' value='SNWD'/> SNWD</label><br/>")
+    controls.append(
+        "<label><input type='checkbox' checked data-traces='[0]' value='SNWD'/> SNWD</label><br/>")
     for col in ptemp_cols:
-        controls.append(f"<label><input type='checkbox' checked data-traces='{json.dumps(trace_map[col])}' value='{col}'/> {col}</label><br/>")
+        controls.append(
+            f"<label><input type='checkbox' checked data-traces='{json.dumps(trace_map[col])}' value='{col}'/> {col}</label><br/>")
 
     html = f"""
 <!DOCTYPE html>
@@ -444,4 +454,3 @@ if __name__ == '__main__':
         create_layered_html_plot(df_dict)
     except Exception as e:
         print('Error creating layered HTML plot:', e)
-
