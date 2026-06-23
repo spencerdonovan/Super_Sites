@@ -31,7 +31,8 @@ def _norm(s: str) -> str:
 
 
 df_regions_norm = df_regions.copy()
-df_regions_norm["editingRegionNorm"] = df_regions_norm["editingRegion"].apply(_norm)
+df_regions_norm["editingRegionNorm"] = df_regions_norm["editingRegion"].apply(
+    _norm)
 
 
 def run_qc_for_triplets(selected_triplets, start, end, interval):
@@ -48,7 +49,8 @@ def run_qc_for_triplets(selected_triplets, start, end, interval):
         if api.status_code == 200:
             data = api.json()
             if data:
-                all_station_results.append({"stationTriplet": site_triplet, "data": data})
+                all_station_results.append(
+                    {"stationTriplet": site_triplet, "data": data})
         else:
             st.warning(f"API error {api.status_code} for {site_triplet}")
 
@@ -60,7 +62,8 @@ def run_qc_for_triplets(selected_triplets, start, end, interval):
 
 def qc_tab_ui(show_sidebar: bool):
     st.header("❄️ Snow, SWE, & Precipitation QC Dashboard")
-    st.markdown('Use the sidebar to select the station(s), date range, and interval for QC processing.')
+    st.markdown(
+        'Use the sidebar to select the station(s), date range, and interval for QC processing.')
 
     site_config = ''
     start = None
@@ -82,14 +85,16 @@ def qc_tab_ui(show_sidebar: bool):
             default_start = default_end - datetime.timedelta(days=30)
 
             with st.form(key='qc_form'):
-                site_config = st.text_input('Site config (region, code, or triplets)', '')
+                site_config = st.text_input(
+                    'Site config (region, code, or triplets)', '')
                 col1, col2 = st.columns(2)
                 with col1:
                     start = st.date_input('Start date', default_start)
                 with col2:
                     end = st.date_input('End date', default_end)
 
-                interval = st.selectbox('Interval', ['DAILY', 'HOURLY'], index=0)
+                interval = st.selectbox(
+                    'Interval', ['DAILY', 'HOURLY'], index=0)
                 run = st.form_submit_button('Run QC')
 
     if not run:
@@ -99,7 +104,8 @@ def qc_tab_ui(show_sidebar: bool):
         st.error('Start date must be on or before end date.')
         return
 
-    tokens_raw = [t.strip() for t in site_config.replace(',', ' ').split() if t.strip()]
+    tokens_raw = [t.strip()
+                  for t in site_config.replace(',', ' ').split() if t.strip()]
     tokens_norm = [_norm(t) for t in tokens_raw]
 
     if len(tokens_norm) == 1 and tokens_norm[0] == 'UTDCO':
@@ -108,7 +114,8 @@ def qc_tab_ui(show_sidebar: bool):
         selected_triplets = tokens_raw
     elif tokens_norm and all(t in set(df_regions_norm['editingRegionNorm'].unique()) for t in tokens_norm):
         selected_triplets = df_regions_norm.loc[
-            df_regions_norm['editingRegionNorm'].isin(tokens_norm), 'stationTriplet'
+            df_regions_norm['editingRegionNorm'].isin(
+                tokens_norm), 'stationTriplet'
         ].tolist()
     else:
         selected_triplets = []
@@ -121,7 +128,8 @@ def qc_tab_ui(show_sidebar: bool):
         st.info('No stations selected. Enter a region, config, or triplet list.')
         return
 
-    results = run_qc_for_triplets(selected_triplets, start.isoformat(), end.isoformat(), interval)
+    results = run_qc_for_triplets(
+        selected_triplets, start.isoformat(), end.isoformat(), interval)
     if results is None:
         st.warning('No data returned from API for selected stations/date range.')
         return
@@ -136,10 +144,14 @@ def qc_tab_ui(show_sidebar: bool):
     if all((results.get(k) is None or results.get(k).empty) for k in ['rule1', 'rule3', 'rule4', 'ruleZ']):
         st.success('Huzzah! No QC rule violations were found')
 
-    show_section('Rule 1 Violations: No decreases in accumulated precipitation.', results.get('rule1'))
-    show_section('Rule 3 Violations: No increase in SWE without corresponding increase in precipitation.', results.get('rule3'))
-    show_section('Rule 4 Violations: No increase in snow depth without corresponding increase in SWE.', results.get('rule4'))
-    show_section('Rule Z Violations: Occurrences where rho_snow = inf.', results.get('ruleZ'))
+    show_section(
+        'Rule 1 Violations: No decreases in accumulated precipitation.', results.get('rule1'))
+    show_section(
+        'Rule 3 Violations: No increase in SWE without corresponding increase in precipitation.', results.get('rule3'))
+    show_section(
+        'Rule 4 Violations: No increase in snow depth without corresponding increase in SWE.', results.get('rule4'))
+    show_section(
+        'Rule Z Violations: Occurrences where rho_snow = inf.', results.get('ruleZ'))
     show_section('Skipped Stations', results.get('skipped'))
 
 
@@ -149,11 +161,11 @@ def profile_tab_ui(show_sidebar: bool):
 
 def render_dashboard_header(selected_dashboard: str):
     active_style = (
-        'background-color:#0d6efd;color:#ffffff;padding:10px 14px;border-radius:8px;' 
+        'background-color:#0d6efd;color:#ffffff;padding:10px 14px;border-radius:8px;'
         'text-align:center;font-weight:700;'
     )
     inactive_style = (
-        'background-color:#f0f2f6;color:#444444;padding:10px 14px;border-radius:8px;' 
+        'background-color:#f0f2f6;color:#444444;padding:10px 14px;border-radius:8px;'
         'text-align:center;font-weight:600;'
     )
 
@@ -171,10 +183,16 @@ def render_dashboard_header(selected_dashboard: str):
 def main():
     st.set_page_config(page_title='QC / Profile Dashboards', layout='wide')
 
+    # Always run snowfall once per session
+    if "has_snowed" not in st.session_state:
+        st.snow()
+        st.session_state["has_snowed"] = True
+
     # st.title('QC Dashboards')
 
     with st.sidebar:
-        selected_dashboard = st.radio('Select dashboard', DASHBOARD_OPTIONS, key='dashboard_selector')
+        selected_dashboard = st.radio(
+            'Select dashboard', DASHBOARD_OPTIONS, key='dashboard_selector')
 
     render_dashboard_header(selected_dashboard)
 
