@@ -38,8 +38,8 @@ def fetch_json(url, timeout=15, retries=3, backoff=1.5):
 
 
 # %%  Variables
-start_date = '2026-05-06'
-end_date = '2026-05-08'
+start_date = '2026-01-01'
+end_date = '2026-02-01'
 # site_triplet = '626:UT:SNTL'   # Midway Valley
 site_triplet = '1300:UT:SNTL'    # Powder Mountain
 # site_triplet = '828:UT:SNTL'    # Trial Lake
@@ -55,7 +55,7 @@ returnSuspectData = 'true'
 # list of elements that you want to request
 # TOBS::2 - HMP500 1 hour average
 # TOBS::1 - ST300 1 hour sample
-# RHUMV::1 - 1 hour sample   ... may need to switch to 1-hr weighted average
+# RHUMV::1 - 1 hour weighted average
 # PTEMP:* 1 hour sample
 # WTEQ::1 - 1 hour sample
 # PREC::1 - 1 hour sample
@@ -120,14 +120,22 @@ def build_df_dict():
 
     return df_dict
 
+# PTEMP heights in inches are 126, 118, 110, 102, 94, 87, 79, 71, 63, 55, 47, 39, 31, 24, 16, 8, 0, -8
+# Logic to determine which PTEMP sensor depth to use for snow surface temperature based on the SNWD value.  If SNWD matches PTEMP height use that PTEMP, e.g. if SNWD is 63 use PTEMP 63.  If SNWD is between two sensor depths, use the sensor depth that is closest but less than the SNWD value. e.g if SNWD is 40 use PTEMP_39, if SNWD is 20 use PTEMP_16. If SNWD is less than -8 or if SNWD is greater than 126 code should not run. 
 
+def get_ptemp_depth(snwd_value):
+    ptemp_heights = [126, 118, 110, 102, 94, 87, 79, 71, 63, 55, 47, 39, 31, 24, 16, 8, 0, -8]
+    for i in snwd_value:
+        if snwd_value < 8 or snwd_value > max(ptemp_heights):
+            return None
+        for height in sorted(ptemp_heights, reverse=True):
+            if snwd_value >= height:
+                return height
+        return None 
+
+#%%
 if __name__ == '__main__':
 
-    # df_dict = build_df_dict()
-    # try:
-    #     create_layered_html_plot(df_dict)
-    # except Exception as e:
-    #     print('Error creating layered HTML plot:', e)
 
     try:
         df_dict = build_df_dict()
@@ -135,3 +143,6 @@ if __name__ == '__main__':
             f"df_dict built with {len(df_dict)} series: {list(df_dict.keys())}")
     except Exception as e:
         print("Error building df_dict:", e)
+
+    get_ptemp_depth(df_dict['SNWD']['value'][0] if 'SNWD' in df_dict and not df_dict['SNWD'].empty else None)
+# %%
