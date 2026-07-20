@@ -40,7 +40,7 @@ def fetch_json(url, timeout=15, retries=3, backoff=1.5):
 
 # %% Function that uses fetch_json to get data for a site
 
-def build_df_dict(site_triplet: str, elements: str, interval: str, start_date: str, end_date: str, returnFlags: str, returnOriginalvalues: str, returnSuspectData: str):
+def build_df_dict(site_triplet: str, elements: str, interval: str, start_date: str, end_date: str, returnFlags: str, returnOriginalValues: str, returnSuspectData: str):
 
     # def build_df_dict():
     url = f'https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1/data?stationTriplets={site_triplet}&elements={elements}&duration={interval}&beginDate={start_date}&endDate={end_date}&periodRef=END&centralTendencyType=NONE&returnFlags={returnFlags}&returnOriginalValues={returnOriginalValues}&returnSuspectData={returnSuspectData}'
