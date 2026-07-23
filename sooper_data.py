@@ -190,13 +190,13 @@ def surf_temp(dictionary: dict):
     PTEMP = pd.DataFrame(PTEMP)
     return PTEMP
 
+
 # %% Testing PTEMP heights
 
 # PTEMP = surf_temp(df_dict)
 
 # # Add DF to main dictionary
 # df_dict['PTEMP'] = PTEMP
-
 
 # %%
 if __name__ == '__main__':
@@ -258,5 +258,3 @@ if __name__ == '__main__':
 
     except Exception as e:
         print("Error building df_dict:", e)
-
-# %%

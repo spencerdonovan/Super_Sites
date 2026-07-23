@@ -50,7 +50,7 @@ returnSuspectData = 'true'
 # WSPDV::1 - 1 hour average
 # Solar - 1 hour average
 
-elements = 'LWINV::1, LWOTV::1, SWINV::1, SWOTV::1, WSPDV::1, TOBS::2, RHUMV::1,  PTEMP:*, SNWD::1, WTEQ::1'
+elements = 'LWINV::1, LWOTV::1, SWINV::1, SWOTV::1, WSPDV::1, TOBS::2, RHUMV::1, PTEMP:*, SNWD::1, WTEQ::1'
 
 # %%
 df_dict = build_df_dict(
@@ -74,3 +74,34 @@ df_dict['PTEMP'] = PTEMP
 
 print(
     f"df_dict built with {len(df_dict)} series: {list(df_dict.keys())}")
+
+# %% Calculate actual vapor pressure see PDF from NWS
+
+# "v" for edited value and "o" for raw data
+TOBS_v = df_dict['TOBS']['value']
+TOBS_o = df_dict['TOBS']['origValue']
+RHUMV_v = df_dict['RHUMV']['value']
+RHUMV_o = df_dict['RHUMV']['origValue']
+
+# Convert TOBS from F to C
+TOBS_v = (TOBS_v - 32) * 5/9
+TOBS_o = (TOBS_o - 32) * 5/9
+
+
+# Compute saturated vapor pressure [mb]
+# the constant represents the saturation vapor pressure of water at the freezing point (0°C), which is exactly 6.11 mb
+# 1 mbar = 1 hPa = 100 Pa, Pa = N/m^2 and N = kg * m / s^2
+e_s_v = 6.11 * 10**((7.5 * TOBS_v)/(273.3 + TOBS_v))
+e_s_o = 6.11 * 10**((7.5 * TOBS_o)/(273.3 + TOBS_o))
+
+# Compute the actual vapor pressure using relative humidity [mb]
+e_a_v = RHUMV_v/100 * e_s_v
+e_a_o = RHUMV_o/100 * e_s_o
+
+# Create actual vapor pressure dataframe
+AVAP = df_dict['TOBS'][['date', 'value', 'origValue']].copy()
+AVAP['value'] = e_a_v
+AVAP['origValue'] = e_a_o
+
+# Add dataframe to df_dict
+df_dict['AVAP'] = AVAP
