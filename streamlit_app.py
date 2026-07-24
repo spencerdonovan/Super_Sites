@@ -23,7 +23,7 @@ SITE_OPTIONS = {
 }
 
 # The API query requests all PTEMP depths plus SNWD for the selected station.
-ELEMENTS = 'PTEMP:*, SNWD::1, WTEQ::1'
+ELEMENTS = 'PTEMP:*, SNWD::1, WTEQ::1, TOBS::1'
 
 
 @st.cache_data(show_spinner=False)
@@ -75,9 +75,7 @@ def build_df_dict(site_triplet, start_date, end_date, interval, elements=ELEMENT
         if elem == 'PTEMP':
             hd = item['stationElement']['heightDepth']
             dict_key = f'{elem}_{hd}'
-        elif elem == 'SNWD':
-            dict_key = elem
-        elif elem == 'WTEQ':
+        elif elem in ['SNWD', 'WTEQ', 'TOBS']:
             dict_key = elem
         else:
             continue
@@ -128,10 +126,25 @@ def build_plotly_figure(merged, selected_layers, show_snwd, title):
 
     # Keep original data untouched; convert only for plotting.
     merged = merged.copy()
-    if ptemp_cols:
-        merged[ptemp_cols] = (merged[ptemp_cols] - 32.0) * 5.0 / 9.0
+    temp_cols = ptemp_cols + (['TOBS'] if 'TOBS' in merged.columns else [])
+    if temp_cols:
+        merged[temp_cols] = (merged[temp_cols] - 32.0) * 5.0 / 9.0
 
     fig = go.Figure()
+
+    # Add TOBS trace if available
+    if 'TOBS' in merged.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=merged.index,
+                y=merged['TOBS'],
+                name='TOBS',
+                line=dict(color='palevioletred', width=2, dash='dot'),
+                mode='lines',
+                visible='legendonly',
+                hovertemplate='TOBS: %{y:.2f} °C<br>%{x|%Y-%m-%d %H:%M}<extra></extra>'
+            )
+        )
 
     # Add SNWD to the secondary axis if requested.
     if show_snwd and 'SNWD' in merged.columns:
