@@ -91,17 +91,54 @@ TOBS_o = (TOBS_o - 32) * 5/9
 # Compute saturated vapor pressure [mb]
 # the constant represents the saturation vapor pressure of water at the freezing point (0°C), which is exactly 6.11 mb
 # 1 mbar = 1 hPa = 100 Pa, Pa = N/m^2 and N = kg * m / s^2
-e_s_v = 6.11 * 10**((7.5 * TOBS_v)/(273.3 + TOBS_v))
-e_s_o = 6.11 * 10**((7.5 * TOBS_o)/(273.3 + TOBS_o))
+es_v = 6.11 * 10**((7.5 * TOBS_v)/(273.3 + TOBS_v))
+es_o = 6.11 * 10**((7.5 * TOBS_o)/(273.3 + TOBS_o))
 
 # Compute the actual vapor pressure using relative humidity [mb]
-e_a_v = RHUMV_v/100 * e_s_v
-e_a_o = RHUMV_o/100 * e_s_o
+ea_v = RHUMV_v/100 * es_v
+ea_o = RHUMV_o/100 * es_o
 
 # Create actual vapor pressure dataframe
 AVAP = df_dict['TOBS'][['date', 'value', 'origValue']].copy()
-AVAP['value'] = e_a_v
-AVAP['origValue'] = e_a_o
+AVAP['value'] = ea_v
+AVAP['origValue'] = ea_o
 
 # Add dataframe to df_dict
 df_dict['AVAP'] = AVAP
+
+# %% Calculate air density P_a
+
+# p is Pa for the the station elevation (1300) Powder Mountain = 8490, (828) Trial Lake = 9970, (626) Midway Valley = 9830, (518) Heavenly Valley = 8540
+
+# site_triplet = '626:UT:SNTL'   # Midway Valley
+site_triplet = '1300:UT:SNTL'    # Powder Mountain
+# site_triplet = '828:UT:SNTL'    # Trial Lake
+# site_triplet = '518:CA:SNTL'    # Heavenly Valley
+
+if site_triplet == '626:UT:SNTL' or site_triplet == '828:UT:SNTL':
+    p = 69800
+elif site_triplet == '1300:UT:SNTL' or site_triple == '518:CA:SNTL':
+    p = 72500
+
+Rd = 287  # [J kg^-1 K^-1] represents the specific gas constant for dry air
+
+# Air Density [kg m^-1]
+rhoair_v = p / (Rd * (TOBS_v+273))
+rhoair_o = p / (Rd * (TOBS_o+273))
+
+# Create air density dataframe
+rhoair = df_dict['AVAP'][['date', 'value', 'origValue']].copy()
+rhoair['value'] = rhoair_v
+rhoair['origValue'] = rhoair_o
+
+# Add dataframe to df_dict
+df_dict['rhoair'] = rhoair
+
+# %% Calculate specific humidity Q_a
+# 0.622 is the ratio of the physical weight of a water molecule compared to the average weight of a dry air molecule
+
+# Air specific humidity
+qa_v = 0.622 * (ea_v / (p - (1 - 0.622) * ea_v))
+qa_o = 0.622 * (ea_o / (p - (1 - 0.622) * ea_o))
+
+# Humidity gradient
