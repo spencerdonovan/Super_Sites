@@ -137,8 +137,26 @@ df_dict['rhoair'] = rhoair
 # %% Calculate specific humidity Q_a
 # 0.622 is the ratio of the physical weight of a water molecule compared to the average weight of a dry air molecule
 
+WSPDV_v = df_dict['WSPDV']['value']
+WSPDV_o = df_dict['WSPDV']['origValue']
+
 # Air specific humidity
 qa_v = 0.622 * (ea_v / (p - (1 - 0.622) * ea_v))
 qa_o = 0.622 * (ea_o / (p - (1 - 0.622) * ea_o))
 
-# Humidity gradient
+# Aerodynamic transfer
+Z = 6       # height [m] where wind speed is measured
+Zo = 0.0001    # height of the roughness element, 0.001 for windy exposed sites 0.0001 for calmer sites
+K = 0.4     # Von Karman constant. dimensionless constant used in fluid mechanics to describe the logarithmic velocity profile of a turbulent fluid flow near a solid boundary
+
+# The Von Kármán constant describes the relationship between the mixing length of turbulent eddies and the distance from the boundary wall. It essentially scales how momentum transfers vertically through shear stress in boundary layer flows, such as wind blowing over the Earth's surface or water moving through a pipe.
+
+ra_v = (np.log(Z/Zo))**2/(K**2 * WSPDV_v)
+ra_o = (np.log(Z/Zo))**2/(K**2 * WSPDV_v)
+
+# %% Calculate the Sensible heat flux
+
+# J kg-1 K-1 the specific heat capacity of air at constant pressure—the amount of energy required to raise the temperature of 1 kg of air by 1 K while pressure remains constant.
+cp = 1004.0
+
+H_v = rhoair_v
