@@ -9,5 +9,5 @@ streamlit run dmp_qc_app.py
 For the standalone PTEMP/SNWD dashboard, use:
 
 ```bash
-streamlit run streamlit_app.py
+streamlit run ptemp_qc.py
 ```

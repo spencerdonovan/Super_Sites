@@ -4,7 +4,7 @@ Streamlit conversion of the original Flask QC dashboard.
 This file now provides a Streamlit app with two tabs:
 - "QC Dashboard": runs the original QC processing and shows tables
 - "Profile Temperature Dashboard": provides a link/button to open the
-  existing `streamlit_app.py` Streamlit application (run separately).
+  existing `ptemp_qc.py` Streamlit application (run separately).
 
 Run with: `streamlit run dmp_qc_app.py`
 """
@@ -15,14 +15,14 @@ import pandas as pd
 import requests
 import streamlit as st
 from dmp_qc import check_qc_rules_all
-from streamlit_app import render_profile_dashboard
+from ptemp_qc import render_profile_dashboard
 
 DASHBOARD_OPTIONS = ['QC Dashboard', 'Profile Temperature Dashboard']
 
 # ********* Load region CSV ********
 df_regions = pd.read_csv("SiteList.csv")
 
-# Streamlit host (for opening separate streamlit_app) can be overridden via env
+# Streamlit host (for opening the separate ptemp_qc app) can be overridden via env
 STREAMLIT_URL = os.getenv("STREAMLIT_URL", "http://localhost:8501")
 
 
