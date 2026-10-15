@@ -376,7 +376,12 @@ def build_heatmap_figure(merged, selected_layers, show_snwd, title):
             zmid=0,
             zmin=z_min,
             zmax=z_max,
-            colorbar=dict(title='PTEMP (°C)'),
+            colorbar=dict(
+                title='PTEMP (°C)',
+                len=1.0,
+                y=0.5,
+                yanchor='middle'
+            ),
             xgap=0,
             ygap=0,
             zsmooth='best',
